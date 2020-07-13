@@ -2,7 +2,8 @@ package = "lua-nng"
 rockspec_format="3.0"
 version = "dev-1"
 source = {
-	url = "*** please add URL for source tarball, zip or repository here ***"
+	url = "git+https://cogarr.net/source/cgit.cgi/lua-nng",
+	tag = "v0.1"
 }
 description = {
 	summary = "A simple binding for Nanomessage Next Generation",
