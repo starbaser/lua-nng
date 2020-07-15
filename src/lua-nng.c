@@ -165,8 +165,40 @@ int lnng_listener_close(lua_State *L){
 	return 0;
 }
 
-static const struct luaL_Reg nng_dialer_m[] = {
+//subscribe(socket,"topic")
+int lnng_subscribe(lua_State *L){
+	nng_socket *sock = tosocket(L,1);
+	size_t size;
+	const char *topic = luaL_checklstring(L,2,&size);
+	lua_pop(L,2);
+	int err = nng_socket_set(*sock,NNG_OPT_SUB_SUBSCRIBE,topic,size);
+	if(err == 0){
+		lua_pushboolean(L,1);
+		return 1;
+	}else{
+		lua_pushboolean(L,0);
+		lua_pushstring(L,nng_strerror(err));
+		return 2;
+	}
+}
 
+//unsubscribe(socket,"topic")
+int lnng_unsubscribe(lua_State *L){
+	nng_socket *sock = tosocket(L,1);
+	const char *topic = lua_tostring(L,2);
+	lua_pop(L,2);
+	int err = nng_socket_set_string(*sock,NNG_OPT_SUB_UNSUBSCRIBE,topic);
+	if(err == 0){
+		lua_pushboolean(L,1);
+		return 1;
+	}else{
+		lua_pushboolean(L,0);
+		lua_pushstring(L,nng_strerror(err));
+		return 2;
+	}
+}
+
+static const struct luaL_Reg nng_dialer_m[] = {
 	{NULL, NULL}
 };
 
@@ -175,11 +207,21 @@ static const struct luaL_Reg nng_listener_m[] = {
 	{NULL, NULL}
 };
 
+static const struct luaL_Reg nng_socket_sub_m[] = {
+	{"subscribe", lnng_subscribe},
+	{"unsubscribe", lnng_unsubscribe},
+	{NULL, NULL}
+};
+
 static const struct luaL_Reg nng_socket_m[] = {
 	{"dial", lnng_dial},
 	{"listen", lnng_listen},
 	{"send", lnng_send},
 	{"recv", lnng_recv},
+
+	//pub/sub only
+	{"subscribe",lnng_subscribe},
+	{"unsubscribe",lnng_unsubscribe},
 	{NULL, NULL}
 };
 
