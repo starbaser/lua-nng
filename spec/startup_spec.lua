@@ -1,5 +1,5 @@
 --[[
-test startup of nanomsg api
+test startup of the nng api
 ]]
 
 describe("nng",function()
@@ -45,27 +45,40 @@ describe("nng",function()
 		end
 	end)
 	it("should be able to use a survey socket to gather information",function()
+		print("Starting survayor respondent test")
 		math.randomseed(os.time())
 		local s = assert(nng.surveyor0_open())
+		print("About to listen")
 		assert(s:listen("ipc:///tmp/survey.ipc"))
+		print("S is listening")
 		local b = {}
 		for i = 1,100 do
+			print("Testing",i)
 			local r = assert(nng.respondent0_open())
 			assert(r:dial("ipc:///tmp/survey.ipc"))
+			print("Dialed",i)
 			b[i] = r
 		end
+		print("About to send hello")
 		assert(s:send("Hello"))
+		print("Done sending hello")
 		for i = 1,100 do
+			print("About to recv from", i)
 			local survey = assert(b[i]:recv())
+			print("Done receving from ",i)
 			assert(survey == "Hello")
+			print("About to send number back")
 			assert(b[i]:send(string.format("%f",math.random())))
+			print("Done sending number back")
 		end
 		local responses = {}
 		while true do
+			print("Got ", #responses, "responses")
 			local succ, msg = s:recv(nng.NNG_FLAG_NONBLOCK)
 			if succ then
 				table.insert(responses,tonumber(succ))
 			elseif msg == "Try again" then
+				print("Sleeping...")
 				os.execute("sleep 1")
 			elseif msg == "Incorrect state" then
 				break
@@ -79,18 +92,55 @@ describe("nng",function()
 		--avg should be about 0.5
 		assert(avg > 0.4)
 		assert(avg < 0.6)
+		print("Completed survayor respondent test")
 	end)
 	it("should be able to use publish and subscribe sockets to transfer information", function()
-		local s1 = assert(nng.pub0_open())
-		local s2 = assert(nng.sub0_open())
-		local s3 = assert(nng.sub0_open())
-		assert(s1:listen("ipc:///tmp/pub.ipc"))
-		assert(s2:subscribe(""))
-		assert(s3:subscribe(""))
-		assert(s2:dial("ipc:///tmp/pub.ipc"))
-		assert(s3:dial("ipc:///tmp/pub.ipc"))
-		assert(s1:send("hello 1"))
-		assert(s2:recv() == "hello 1")
-		assert(s3:recv() == "hello 1")
+		print("starting pubsub test")
+		for i = 1,1000 do
+			local s1 = assert(nng.pub0_open())
+			local s2 = assert(nng.sub0_open())
+			local s3 = assert(nng.sub0_open())
+			print("everything opened")
+			--local listener, err = s1:listen("tcp://127.0.0.1:1000")
+			local listener, err = s1:listen("ipc:///tmp/pub.ipc")
+			local num_addr_in_use = 0
+			while err == "Address in use" do
+				print("Got addr in use")
+				num_addr_in_use = num_addr_in_use + 1
+				if num_addr_in_use > 1000 then
+					error("After multiple attempts, failed to bind on round " .. i)
+				end
+				--listener, err = s1:listen("tcp://127.0.0.1:1000")
+				listener, err = s1:listen("ipc:///tmp/pub.ipc")
+			end
+			print("s1 is listeneing...")
+			assert(s2:subscribe("hello"))
+			assert(s3:subscribe("hello"))
+			--assert(s2:dial("tcp://127.0.0.1:1000"))
+			--assert(s3:dial("tcp://127.0.0.1:1000"))
+			assert(s2:dial("ipc:///tmp/pub.ipc"))
+			assert(s3:dial("ipc:///tmp/pub.ipc"))
+			print("Everything set up")
+			assert(s1:send("hello 1"))
+			print("sent")
+			assert.are_equal(s2:recv(),"hello 1")
+			print("received 1")
+			assert.are_equal(s3:recv(),"hello 1")
+			print("received 2")
+			listener:close()
+			s1:close()
+		end
+		print("Finishing pubsub test")
+	end)
+	describe("tcp transport",function()
+		it("has a keepalive option that prevents the tcp connection from closing",function()
+			print("starting tcp transport test")
+			local s1 = assert(nng.pair1_open())
+			local s2 = assert(nng.pair1_open())
+			--s1[nng.NNG_OPT_TCP_KEEPALIVE] = true
+			assert(s1:listen("tcp://127.0.0.1:1000"))
+			assert(s2:dial("tcp://127.0.0.1:1000"))
+			print("Finished tcp transport test")
+		end)
 	end)
 end)
