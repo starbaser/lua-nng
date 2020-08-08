@@ -76,6 +76,12 @@ nng_dialer* todialer(lua_State *L, int offset){
 	return (nng_dialer*)lua_touserdata(L,offset);
 }
 
+nng_sockaddr* tosockaddr(lua_State *L, int offset){
+	luaL_checkudata(L,offset,"nng.sockaddr");
+	return (nng_sockaddr*)lua_touserdata(L,offset);
+}
+
+
 //socket:listen(url[, flags]) :: listener
 int lnng_listen(lua_State *L){
 	int argc = lua_gettop(L);
@@ -259,6 +265,68 @@ int lnng_listener_set(lua_State *L){
 	return 0;
 }
 
+int lnng_sockaddr_get(lua_State *L){
+	nng_sockaddr *sa = tosockaddr(L,1);
+	unsigned int f = sa->s_family;
+	const char *field = luaL_checkstring(L,2);
+	lua_pop(L,2);
+	printf("Getting %s from sockaddr\n",field);
+	if(strcmp(field,"type") == 0){
+		lua_pushnumber(L,f);
+		return 1;
+	}
+	if(f == NNG_AF_UNSPEC){
+		printf("Unspec\n");
+		lua_pushnil(L);
+		return 1;
+	}else if(f == NNG_AF_INPROC){
+		printf("Inproc\n");
+		nng_sockaddr_inproc sai = sa->s_inproc;
+		if(strcmp(field,"name") == 0){
+			lua_pushstring(L, sai.sa_name);
+			return 1;
+		}
+	}else if(f == NNG_AF_IPC){
+		printf("IPC\n");
+		nng_sockaddr_ipc sai = sa->s_ipc;
+		if(strcmp(field,"path") == 0){
+			lua_pushstring(L, sai.sa_path);
+			return 1;
+		}
+	}else if(f == NNG_AF_INET){
+		printf("Inet\n");
+		nng_sockaddr_in sai = sa->s_in;
+		if(strcmp(field,"addr") == 0){
+			lua_pushnumber(L, sai.sa_addr);
+			return 1;
+		}else if(strcmp(field,"port") == 0){
+			lua_pushnumber(L, sai.sa_port);
+			return 1;
+		}
+	}else if(f == NNG_AF_INET6){
+		nng_sockaddr_in6 sai = sa->s_in6;
+		if(strcmp(field,"addr") == 0){
+			lua_pushlstring(L,sai.sa_addr,16);
+			return 1;
+		}else if(strcmp(field,"port") == 0){
+			lua_pushnumber(L,sai.sa_port);
+			return 1;
+		}
+	}else if(f == NNG_AF_ZT){
+		nng_sockaddr_zt sai = sa->s_zt;
+		if(strcmp(field,"nwid") == 0){
+			lua_pushnumber(L,sai.sa_nwid);
+			return 1;
+		}else if(strcmp(field,"nodeid") == 0){
+			lua_pushnumber(L,sai.sa_nodeid);
+			return 1;
+		}else if(strcmp(field,"port") == 0){
+			lua_pushnumber(L,sai.sa_port);
+			return 1;
+		}
+	}
+}
+
 //set(socket, "flag", value)
 int lnng_socket_set(lua_State *L){
 	nng_socket *sock = tosocket(L,1);
@@ -315,23 +383,34 @@ int lnng_socket_set(lua_State *L){
 
 //get(socket,"flag",value)
 int lnng_socket_get(lua_State *L){
+	/*printf("Lua stack is %d\n",lua_gettop(L));*/
 	nng_socket *sock = tosocket(L,1);
 	const char *flag = luaL_checkstring(L,2);
-	//TODO NNG_OPT_LOCADDR //read-only
+	//NNG_OPT_LOCADDR - listeners, dialers, and connected pipes
 	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RAW, bool, nng_socket_get_bool, lua_pushboolean); //read-only
-	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECONNMINT, nng_duration, nng_socket_get_ms, lua_pushinteger);
-	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECONNMAXT, nng_duration, nng_socket_get_ms, lua_pushinteger);
-	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECVBUF, int, nng_socket_get_int, lua_pushinteger);
-	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECVFD, int, nng_socket_get_int, lua_pushinteger); //read-only
-	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECVMAXSZ, size_t, nng_socket_get_size, lua_pushinteger);
-	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECVTIMEO, nng_duration, nng_socket_get_ms, lua_pushinteger);
-	//TODO NNG_OPT_REMADDR
+	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECONNMINT, nng_duration, nng_socket_get_ms, lua_pushinteger);//sockets and dialers, if both dialer and socket are set, dialer overrides socket
+	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECONNMAXT, nng_duration, nng_socket_get_ms, lua_pushinteger); //sockets and dialers, if both dialer and socket are set, dialer overrides socket
+	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECVBUF, int, nng_socket_get_int, lua_pushinteger);//socket only
+	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECVFD, int, nng_socket_get_int, lua_pushinteger); //socket only, read-only
+	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECVMAXSZ, size_t, nng_socket_get_size, lua_pushinteger);//sockets, dialers and listeners
+	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_RECVTIMEO, nng_duration, nng_socket_get_ms, lua_pushinteger);//socket only
+	if(strcmp(flag, NNG_OPT_REMADDR) == 0){
+		lua_pop(L,lua_gettop(L));
+		nng_sockaddr *sa = (nng_sockaddr*)lua_newuserdata(L,sizeof(nng_sockaddr));//{udata}
+		int err = nng_socket_get_addr(*sock, NNG_OPT_REMADDR, sa);//{udata}
+		if(err == 0){
+			luaL_setmetatable(L,"nng.sockaddr");
+			return 1;
+		}else{
+			return luaL_error(L,"Failed to lookup local address - %s",nng_strerror(err));
+		}
+	}
 	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_SENDBUF, int, nng_socket_get_int, lua_pushinteger);
 	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_SENDFD, int, nng_socket_get_int, lua_pushinteger); //read-only
 	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_SENDTIMEO, nng_duration, nng_socket_get_ms, lua_pushinteger);
 	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_SOCKNAME, char*, nng_socket_get_string, lua_pushstring);
 	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_MAXTTL, int, nng_socket_get_int, lua_pushinteger);
-	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_URL, char*, nng_socket_get_string, lua_pushstring); //read-only
+	//SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_URL, char*, nng_socket_get_string, lua_pushstring); //read-only for dialers, listeners, and pipes
 	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_PROTO, int, nng_socket_get_int, lua_pushinteger); //read-only
 	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_PEER, int, nng_socket_get_int, lua_pushinteger); //read-only
 	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_PROTONAME, char*, nng_socket_get_string, lua_pushstring); //read-only
@@ -366,6 +445,93 @@ int lnng_socket_get(lua_State *L){
 
 	//Survayor/respondent options
 	SOCKET_OPTION_GET(L, sock, flag, NNG_OPT_SURVEYOR_SURVEYTIME, nng_duration, nng_socket_get_ms, lua_pushinteger);
+	lua_pop(L,2);
+
+	//If none of the above options matched, get the value from the metatable
+	int type = luaL_getmetatable(L,"nng.socket_m");////{socket_m}
+	/*luaL_newlib(L,nng_socket_m);*/
+	lua_getfield(L,-1,"__index");
+	lua_getfield(L,-1,flag);//{socket_m},{socket},any
+	int ref = luaL_ref(L,LUA_REGISTRYINDEX);//{socket_m},{socket}
+	lua_pop(L,2);//
+	lua_rawgeti(L,LUA_REGISTRYINDEX,ref);//any
+	return 1;
+}
+
+/*#define DIALER_OPTION_SET(L, socket, flag, matches, ntype, gets, sets) \*/
+	/*if(strcmp(flag, matches) == 0){\*/
+		/*ntype value = (ntype)gets(L,3);\*/
+		/*int err = sets(*socket, flag, value);\*/
+		/*lua_pop(L,lua_gettop(L));\*/
+		/*if(err != 0){\*/
+			/*lua_pushboolean(L,0);\*/
+			/*lua_pushfstring(L,nng_strerror(err));\*/
+			/*return 2;\*/
+		/*}else{\*/
+			/*return 0;\*/
+		/*}\*/
+	/*}*/
+
+/*#define DIALER_OPTION_GET(L, dialer, flag, matches, ntype, gets, pushes) \*/
+	/*if(strcmp(flag, matches) == 0){\*/
+		/*ntype value;\*/
+		/*int err = gets(*socket, flag, &value);\*/
+		/*lua_pop(L,lua_gettop(L));\*/
+		/*if(err != 0){\*/
+			/*lua_pushboolean(L,0);\*/
+			/*lua_pushfstring(L,nng_strerror(err));\*/
+			/*return 2;\*/
+		/*}else{\*/
+			/*pushes(L,value);\*/
+			/*return 1;\*/
+		/*}\*/
+	/*}*/
+
+
+int lnng_dialer_get(lua_State *L){
+	nng_dialer *dialer = todialer(L,1);
+	const char *flag = luaL_checkstring(L,2);
+	if(strcmp(flag, NNG_OPT_LOCADDR) == 0){
+		printf("Looking for dialer's locaddr\n");
+		lua_pop(L,lua_gettop(L));
+		nng_sockaddr *sa = (nng_sockaddr*)lua_newuserdata(L,sizeof(nng_sockaddr));//{udata}
+		int err = nng_dialer_get_addr(*dialer , NNG_OPT_LOCADDR, sa);//{udata}
+		if(err == 0){
+			luaL_setmetatable(L,"nng.sockaddr");
+			return 1;
+		}else{
+			return luaL_error(L,"Failed to lookup local address - %s",nng_strerror(err));
+		}
+	}
+	SOCKET_OPTION_GET(L, dialer, flag, NNG_OPT_RECONNMINT, nng_duration, nng_dialer_get_ms, lua_pushinteger);//sockets and dialers, if both dialer and socket are set, dialer overrides socket
+	SOCKET_OPTION_GET(L, dialer, flag, NNG_OPT_RECONNMAXT, nng_duration, nng_dialer_get_ms, lua_pushinteger); //sockets and dialers, if both dialer and socket are set, dialer overrides socket
+	SOCKET_OPTION_GET(L, dialer, flag, NNG_OPT_RECVMAXSZ, size_t, nng_dialer_get_size, lua_pushinteger);//sockets, dialers and listeners
+	if(strcmp(flag, NNG_OPT_REMADDR) == 0){
+		lua_pop(L,lua_gettop(L));
+		nng_sockaddr *sa = (nng_sockaddr*)lua_newuserdata(L,sizeof(nng_sockaddr));//{udata}
+		int err = nng_dialer_get_addr(*dialer, NNG_OPT_REMADDR, sa);//{udata}
+		if(err == 0){
+			luaL_setmetatable(L,"nng.sockaddr");
+			return 1;
+		}else{
+			return luaL_error(L,"Failed to lookup remote address - %s",nng_strerror(err));
+		}
+	}
+	SOCKET_OPTION_GET(L, dialer, flag, NNG_OPT_URL, char*, nng_dialer_get_string, lua_pushstring); //read-only for dialers, listeners, and pipes
+	
+	//If none of the above options matched, get the value from the metatable
+	int type = luaL_getmetatable(L,"nng.dialer_m");////{socket_m}
+	/*luaL_newlib(L,nng_socket_m);*/
+	lua_getfield(L,-1,"__index");
+	lua_getfield(L,-1,flag);//{socket_m},{socket},any
+	int ref = luaL_ref(L,LUA_REGISTRYINDEX);//{socket_m},{socket}
+	lua_pop(L,2);//
+	lua_rawgeti(L,LUA_REGISTRYINDEX,ref);//any
+	return 1;
+}
+
+int lnng_dialer_set(lua_State *L){
+	
 }
 
 static const struct luaL_Reg nng_dialer_m[] = {
@@ -375,12 +541,6 @@ static const struct luaL_Reg nng_dialer_m[] = {
 
 static const struct luaL_Reg nng_listener_m[] = {
 	{"close",lnng_listener_close},
-	{NULL, NULL}
-};
-
-static const struct luaL_Reg nng_socket_sub_m[] = {
-	{"subscribe", lnng_subscribe},
-	{"unsubscribe", lnng_unsubscribe},
 	{NULL, NULL}
 };
 
@@ -416,20 +576,27 @@ static const struct luaL_Reg nng_f[] = {
 #define flag(name) lua_pushnumber(L,name); lua_setfield(L,-2,#name);
 #define option(name) lua_pushstring(L,name); lua_setfield(L,-2,#name);
 int luaopen_nng(lua_State *L){
+	luaL_newmetatable(L,"nng.socket_m");//{}
+	luaL_newlib(L,nng_socket_m);//{},{socket_m}
+	lua_setfield(L,-2,"__index");//{__index={socket_m}}
+	lua_pop(L,1);//
+	
 	luaL_newmetatable(L,"nng.socket");//{}
-	luaL_newlib(L,nng_socket_m);//{},{}
-	lua_newtable(L);//{},{},{}
-	lua_pushcfunction(L,lnng_socket_get);//{},{},{},get()
-	lua_setfield(L,-2,"__index");//{},{},{__index=get()}
-	lua_setmetatable(L,-2);//{},{}
-	lua_setfield(L,-2,"__index");//{__index = {}}
-	lua_pushcfunction(L,lnng_socket_close);//{__index = {}},close()
-	lua_setfield(L,-2,"__gc");//{__index = {}, __gc = close()}
-	lua_pushcfunction(L,lnng_socket_set);//{__index = {}, __gc = close()}, set()
-	lua_setfield(L,-2,"__newindex");//{__index = {}, __gc = close(), __newindex = set()}
+	lua_pushcfunction(L,lnng_socket_get);//{},socket_get()
+	lua_setfield(L,-2,"__index");//{__index = socket_get()}
+	lua_pushcfunction(L,lnng_socket_close);//{__index = {socket_m}},close()
+	lua_setfield(L,-2,"__gc");//{__index = {socket_m}, __gc = close()}
+	lua_pushcfunction(L,lnng_socket_set);//{__index = {socket_m}, __gc = close()}, set()
+	lua_setfield(L,-2,"__newindex");//{__index = {socket_m}, __gc = close(), __newindex = set()}
 	lua_pop(L,1);
 
-	luaL_newmetatable(L,"nng.dialer");
+	luaL_newmetatable(L,"nng.dialer");//{}
+	lua_pushcfunction(L,lnng_dialer_get);//{},dialer_get()
+	lua_setfield(L,-2,"__index");
+	lua_pushcfunction(L,lnng_dialer_set);
+	lua_setfield(L,-2,"__newindex");
+
+	luaL_newmetatable(L,"nng.dialer_m");
 	luaL_newlib(L,nng_dialer_m);
 	lua_setfield(L,-2,"__index");
 	/*lua_pushcfunction(L,lnng_dialer_close);*/
@@ -441,6 +608,11 @@ int luaopen_nng(lua_State *L){
 	lua_setfield(L,-2,"__index");
 	/*lua_pushcfunction(L,lnng_listener_close);*/
 	/*lua_setfield(L,-2,"__gc");*/
+	lua_pop(L,1);
+
+	luaL_newmetatable(L,"nng.sockaddr");//{nng.sockaddr}
+	lua_pushcfunction(L,lnng_sockaddr_get);//{nng.sockaddr},sockaddr_get
+	lua_setfield(L,-2,"__index");//{nng_sockaddr}
 	lua_pop(L,1);
 
 	luaL_newlib(L,nng_f);
