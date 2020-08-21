@@ -86,51 +86,51 @@ describe("nng.aio",function()
 		end
 		print("Sucessful completion of recv_any test")
 	end)
-	it("Should accept multiple sockets of dispirate types #writing",function()
-		local servers = {}
-		local clients = {}
-		local messages = {}
-		local halfs = {
-			{"rep","req",true},
-			{"bus","bus",nil},
-			{"surveyor","respondent",false},
-			{"pub","sub",false}
-		}
-		for i = 1, 10 do
-			local rng = math.random(#halfs)
+	--it("Should accept multiple sockets of dispirate types #writing",function()
+		--local servers = {}
+		--local clients = {}
+		--local messages = {}
+		--local halfs = {
+			--{"rep","req",true},
+			--{"bus","bus",nil},
+			--{"surveyor","respondent",false},
+			--{"pub","sub",false}
+		--}
+		--for i = 1, 10 do
+			--local rng = math.random(#halfs)
 
-			--Create server
-			servers[i] = assert(nng[halfs[rng][1] .. "0_open"]())
-			local url = string.format("tcp://127.0.0.1:%d",4000 + i)
-			assert(servers[i]:listen(url))
+			----Create server
+			--servers[i] = assert(nng[halfs[rng][1] .. "0_open"]())
+			--local url = string.format("tcp://127.0.0.1:%d",4000 + i)
+			--assert(servers[i]:listen(url))
 
-			--Create clients
-			local numclients = math.random(1,3)
-			clients[i] = {}
-			messages[i] = {}
-			for j = 1, numclients do
-				clients[i][j] = assert(nng[halfs[rng][2] .. "0_open"]())
-				assert(clients[i][j]:dial(url))
-				messages[i][j] = {}
-				if halfs[rng][3] == true then
-					--we send messages
-					local nummessages = math.random(5)
-					for k = 1, nummessages do
-						local message = string.format("ping_%d_%d_%d",i,j,k)
-						assert(clients[i][j]:send(message))
-						table.insert(messages[i][j],message)
-					end
-				--elseif halfs[rng][3] == nil then
-					--we can send or receive messages
+			----Create clients
+			--local numclients = math.random(1,3)
+			--clients[i] = {}
+			--messages[i] = {}
+			--for j = 1, numclients do
+				--clients[i][j] = assert(nng[halfs[rng][2] .. "0_open"]())
+				--assert(clients[i][j]:dial(url))
+				--messages[i][j] = {}
+				--if halfs[rng][3] == true then
+					----we send messages
+					--local nummessages = math.random(5)
+					--for k = 1, nummessages do
+						--local message = string.format("ping_%d_%d_%d",i,j,k)
+						--assert(clients[i][j]:send(message))
+						--table.insert(messages[i][j],message)
+					--end
+				----elseif halfs[rng][3] == nil then
+					----we can send or receive messages
 					
-				else
-					--we receive and reply to messages
+				--else
+					----we receive and reply to messages
 
-				end
-			end
-		end
-		for socket, message in pairs(nng.aio.recv_any(table.unpack(servers))) do
-			print("GOT MESSAGE:",message)
-		end
-	end)
+				--end
+			--end
+		--end
+		--for socket, message in pairs(nng.aio.recv_any(table.unpack(servers))) do
+			--print("GOT MESSAGE:",message)
+		--end
+	--end)
 end)
