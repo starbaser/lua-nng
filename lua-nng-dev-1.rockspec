@@ -38,9 +38,4 @@ build = {
 		LIB_EXTENSION="$(LIB_EXTENSION)",
 		CP="$(CP)",
 	},
-	install = {
-		bin = {
-			"bin/nng.dll"
-		}
-	}
 }
