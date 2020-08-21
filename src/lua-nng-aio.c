@@ -172,10 +172,10 @@ void push_callback(void *v){
 //messages can be thrown out becuase of the canceling of the async recieves.
 //recv_any(socket1, socket2, ...) :: socket | false, message | errmsg,
 int lnng_aio_recv(lua_State *L){
-	nng_mtx *luamtx, *callbackmtx, *setupmtx;
+	nng_mtx *luamtx, *callbackmtx;
 	int err = nng_mtx_alloc(&luamtx);
 	err |= nng_mtx_alloc(&callbackmtx);
-	err |= nng_mtx_alloc(&setupmtx);
+	/*err |= nng_mtx_alloc(&setupmtx);*/
 	if(err != 0){
 		/*printf("Something when wrong when allocating mutexes\n");*/
 		lua_pushboolean(L,0);
