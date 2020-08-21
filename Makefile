@@ -8,7 +8,7 @@ ifdef $(LUA_LIBDIR)
 	LADFLAGS+= -L$(LUA_LIBDIR)
 endif
 LD=gcc
-LIBS=-lnng -llua53
+LIBS=-lnng -llua5.3
 
 ifeq ($(OS), Windows_NT)
 	LDFLAGS+=-mwindows
