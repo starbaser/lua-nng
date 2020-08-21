@@ -29,101 +29,6 @@
 #include "lua-nng-common.h"
 #include "lua-nng.h"
 
-struct lnng_aio{
-	lua_State *L;
-	int func;
-	int args;
-	nng_aio *aio;
-};
-
-void lcallback(void *lfaa){
-	/*printf("aio callback running\n");*/
-	struct lnng_aio *l = (struct lnng_aio*)lfaa;
-	lua_State *L = l->L;
-	/*printf("At the beginning we have: %d\n",lua_gettop(L));*/
-	for(int i = 1; i <= lua_gettop(L); i++){
-		/*printf("-%d - %s\n",i,lua_typename(L,lua_type(L,-i)));*/
-		lua_getglobal(L,"print");
-		lua_pushvalue(L,i);
-		lua_call(L,1,0);
-	}
-	lua_getglobal(L,"table");//{table}
-	lua_pushcfunction(L,traceback);//{table},traceback()
-	lua_rawgeti(L,LUA_REGISTRYINDEX, l->func);//{table},traceback(),callb()
-	/*printf("foo\n");*/
-	lua_getfield(L,-3,"unpack");//{table},traceback(),callb(),table.unpack()
-	/*printf("unpacked\n");*/
-	/*printf("unpack, -1 - %s\n",lua_typename(L,lua_type(L,-1)));*/
-	/*printf("Args was: %d\n",l->args);*/
-	lua_rawgeti(L,LUA_REGISTRYINDEX, l->args);//{table},traceback(),callb(),table.unpack(),{args}
-	/*printf("got args\n");*/
-	/*printf("-2 - %s\n",lua_typename(L,lua_type(L,-2)));*/
-	/*printf("-1 - %s\n",lua_typename(L,lua_type(L,-1)));*/
-	lua_call(L, 1, LUA_MULTRET);//{table},traceback(), callb(), args...
-	/*printf("bar\n");*/
-	/*printf("Top: %d\n",lua_gettop(L));*/
-	for(int i = 1; i <= lua_gettop(L); i++){
-		/*printf("-%d - %s\n",i,lua_typename(L,lua_type(L,-i)));*/
-	}
-	int numargs = lua_gettop(L) - 3;
-	/*printf("Nargs:%d\n",numargs);*/
-	lua_pcall(L, numargs, 0, 2);//{table},traceback()
-	/*printf("Finished with everything, poping last 2 and returning\n");*/
-	lua_pop(L,2);//
-}
-
-//nng.aio_alloc(callback(), args...) :: nng.aio
-int lnng_aio_alloc(lua_State *L){
-	int argc = lua_gettop(L);//callback(), args...
-	lua_createtable(L,argc - 1, 0);//callback(), args..., {}
-	for(int i = 1; i < argc; i++){
-		/*printf("Adding element %d to arg table (%s)\n",i,lua_typename(L,lua_type(L,i + 1)));*/
-		lua_pushnumber(L, i);
-		lua_getglobal(L,"print");
-		lua_pushvalue(L, i + 1);
-		lua_call(L,1,0);
-		lua_pushvalue(L, i + 1);
-		lua_settable(L, -3);
-	}
-	int argtbl = luaL_ref(L, LUA_REGISTRYINDEX);//callback(), args...
-	lua_pop(L, argc - 1);//callback()
-	int func = luaL_ref(L, LUA_REGISTRYINDEX);//
-	
-	struct lnng_aio *lfaa = (struct lnng_aio*)lua_newuserdata(L,sizeof(struct lnng_aio));//userdata
-	lfaa->L = L;
-	lfaa->args = argtbl;
-	lfaa->func = func;
-	nng_aio *aio;
-	int err = nng_aio_alloc(&aio, lcallback, (void*)lfaa);
-	lfaa->aio = aio;
-	if(err == 0){
-		/*printf("After aio_alloc we have:%d",lua_gettop(L));*/
-		luaL_setmetatable(L,"nng.aio.struct");
-		return 1;
-	}else{
-		lua_pop(L,1);
-		lua_pushboolean(L,0);
-		lua_pushstring(L,nng_strerror(err));
-		return 2;
-	}
-}
-struct nng_aio* toaio(lua_State *L, int index){
-	struct lnng_aio* l = (struct lnng_aio*)luaL_checkudata(L,index,"nng.aio.struct");
-	return l->aio;
-}
-
-//sleep(duration, aio)
-int lnng_aio_sleep(lua_State *L){
-	/*printf("sleep called\n");*/
-	int duration = luaL_checkinteger(L,1);
-	/*printf("Duration was %d\n");*/
-	nng_aio *aio = toaio(L,2);
-	/*printf("Got aio: %p\n",aio);*/
-	nng_sleep_aio(duration, aio);
-	/*printf("did sleep\n");*/
-	return 0;
-}
-
 struct callback_info {
 	lua_State *L;
 	nng_mtx *lmutex; //mutex for the lua state
@@ -167,10 +72,7 @@ void push_callback(void *v){
 	/*printf("Done with callback\n");*/
 }
 
-//TODO: there is a wierd bug here:
-//If multiple sockets receive a message at the same time, one or more of those
-//messages can be thrown out becuase of the canceling of the async recieves.
-//recv_any(socket1, socket2, ...) :: socket | false, message | errmsg,
+//recv_any(socket1, socket2, ...) :: {socket = message}
 int lnng_aio_recv(lua_State *L){
 	nng_mtx *luamtx, *callbackmtx;
 	int err = nng_mtx_alloc(&luamtx);
@@ -265,7 +167,6 @@ static const struct luaL_Reg nng_aio_mutex_m[] = {
 
 
 static const struct luaL_Reg nng_http_f[] = {
-	{"alloc",lnng_aio_alloc},
 	{"recv_any",lnng_aio_recv},
 	{NULL, NULL}
 };
