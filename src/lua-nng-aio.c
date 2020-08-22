@@ -151,7 +151,7 @@ int lnng_aio_recv(lua_State *L){
 	/*printf("Freeing things\n");*/
 	nng_cv_free(cv);
 	nng_mtx_free(callbackmtx);
-	nng_mtx_unlock(luamtx);//mutexes must not be locked when they are freed
+	//nng_mtx_unlock(luamtx);//mutexes must not be locked when they are freed
 	nng_mtx_free(luamtx);
 	/*printf("Done freeing everything, returning...\n");*/
 	return 1;
