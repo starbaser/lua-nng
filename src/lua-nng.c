@@ -42,6 +42,13 @@
 		}\
 	}
 
+/***
+Opens a socket using the bus scaleability protocol
+Sockets are not connected to anything at initalization, and some options may error.
+See the [options](/options) section for information on options. See [nng_bus](https://nng.nanomsg.org/man/tip/nng_bus.7.html) for more information on the protocol.
+@function nng.open_bus0()
+@returns nng.socket A socket using the bus protocol
+*/
 OPEN(bus0);
 OPEN(pair1);
 OPEN(pub0);

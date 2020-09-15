@@ -142,6 +142,7 @@ int lnng_aio_recv(lua_State *L){
 		struct callback_info *ci = cis[i];
 		/*printf("About to stop aio %d\n",ci->aio);*/
 		/*nng_aio_cancel(ci->aio);*/
+		luaL_unref(L,LUA_REGISTRYINDEX,ci->socketref);
 		nng_aio_stop(ci->aio);
 		nng_aio_free(ci->aio);
 		free(ci);

@@ -23,5 +23,5 @@ luarocks install --server=http://rocks.cogarr.net lua-nng
 
 prints "hello"
 
-For more examples, see sepc/start\_spec.lua
+For more examples, see spec/start\_spec.lua
 
