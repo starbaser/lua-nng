@@ -4,13 +4,15 @@ This is a simple binding of [Nanomessage Next Generation](https://github.com/nan
 
 ## Installation
 
-The easiest way to download lua-nng is with [luarocks](https://github.com/luarocks/luarocks)
+The easiest way to download lua-nng is with [luarocks](https://github.com/luarocks/luarocks).
 
 ```
 luarocks install --server=http://rocks.cogarr.net lua-nng
 ```
 
 ## Example
+
+	local nng = require("nng")
 
 	local s1 = nng.pair1_open()
 	local s2 = nng.pair1_open()
@@ -19,9 +21,7 @@ luarocks install --server=http://rocks.cogarr.net lua-nng
 	s2:dial("ipc://tmp/pair.ipc")
 
 	s2:send("hello")
-	print(s1:recv())
-
-prints "hello"
+	print(s1:recv()) --prints "hello"
 
 For more examples, see spec/start\_spec.lua
 
