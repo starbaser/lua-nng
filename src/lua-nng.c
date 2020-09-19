@@ -27,7 +27,11 @@
 
 #include <string.h>
 #include "lua-nng-aio.h"
-
+/***
+The lua binding of Nanomessage Next Generation
+@namespace nng
+*/
+@namespace nng
 #define OPEN(name)\
 	int lnng_ ## name ## _open(lua_State *L){\
 		nng_socket *s = (nng_socket*)lua_newuserdata(L,sizeof(nng_socket));\
@@ -143,8 +147,11 @@ int lnng_send(lua_State *L){
 	if(argc >= 3){
 		flags = luaL_checkinteger(L,3);
 	}
-	lua_pop(L,argc);
+	//No garentee that *data is valid after it gets poped from the stack
+	//so we have to send it (which copies the value) before poping it from
+	//the stack.
 	int err = nng_send(*sock, (void*)data, datasize, flags);
+	lua_pop(L,argc);
 	if(err == 0){
 		lua_pushboolean(L,1);
 		return 1;
