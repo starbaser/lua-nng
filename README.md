@@ -18,7 +18,7 @@ luarocks install --server=http://rocks.cogarr.net lua-nng
 	local s2 = nng.pair1_open()
 
 	s1:listen("ipc:///tmp/pair.ipc")
-	s2:dial("ipc://tmp/pair.ipc")
+	s2:dial("ipc:///tmp/pair.ipc")
 
 	s2:send("hello")
 	print(s1:recv()) --prints "hello"
