@@ -1,14 +1,17 @@
 CC?=gcc
-CAFLAGS+=-I$(NNG_INCDIR) -I$(LUA_INCDIR) $(CFLAGS)
+CAFLAGS+=-I$(NNG_INCDIR) -I$(LUA_INCDIR) -L$(LUA_LIBDIR) $(CFLAGS)
 LADFLAGS+=$(LIBFLAG) $(LDFLAGS)
+LIBS=-lnng
 ifdef $(NNG_LIBDIR)
 	LADFLAGS+= -L$(NNG_LIBDIR)
 endif
 ifdef $(LUA_LIBDIR)
 	LADFLAGS+= -L$(LUA_LIBDIR)
 endif
+ifdef $(LUA_LIB)
+	LIBS+= -l$(LUA_LIB)
+endif
 LD=gcc
-LIBS=-lnng -llua5.3
 
 ifeq ($(OS), Windows_NT)
 	LDFLAGS+=-mwindows
