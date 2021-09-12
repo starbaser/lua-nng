@@ -27,11 +27,17 @@
 
 #include <string.h>
 #include "lua-nng-aio.h"
+#include "lua-nng-common.h"
+
+/*#ifndef luaL_setmetatable*/
+	/*#define luaL_setmetatable lua_setmetatable*/
+/*#endif*/
+
+
 /***
 The lua binding of Nanomessage Next Generation
 @namespace nng
 */
-@namespace nng
 #define OPEN(name)\
 	int lnng_ ## name ## _open(lua_State *L){\
 		nng_socket *s = (nng_socket*)lua_newuserdata(L,sizeof(nng_socket));\
@@ -462,7 +468,7 @@ int lnng_socket_get(lua_State *L){
 	lua_pop(L,2);
 
 	//If none of the above options matched, get the value from the metatable
-	int type = luaL_getmetatable(L,"nng.socket_m");////{socket_m}
+	luaL_getmetatable(L,"nng.socket_m");////{socket_m}
 	/*luaL_newlib(L,nng_socket_m);*/
 	lua_getfield(L,-1,"__index");
 	lua_getfield(L,-1,flag);//{socket_m},{socket},any
@@ -534,7 +540,7 @@ int lnng_dialer_get(lua_State *L){
 	SOCKET_OPTION_GET(L, dialer, flag, NNG_OPT_URL, char*, nng_dialer_get_string, lua_pushstring); //read-only for dialers, listeners, and pipes
 	
 	//If none of the above options matched, get the value from the metatable
-	int type = luaL_getmetatable(L,"nng.dialer_m");////{socket_m}
+	luaL_getmetatable(L,"nng.dialer_m");////{socket_m}
 	/*luaL_newlib(L,nng_socket_m);*/
 	lua_getfield(L,-1,"__index");
 	lua_getfield(L,-1,flag);//{socket_m},{socket},any

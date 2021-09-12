@@ -23,6 +23,8 @@
 #include <nng/protocol/survey0/respond.h>
 #include <nng/protocol/survey0/survey.h>
 
+#include "lua-nng-common.h"
+
 void handle_callback(nng_aio *aio){
 	
 }

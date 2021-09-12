@@ -4,7 +4,24 @@ This is a simple binding of [Nanomessage Next Generation](https://github.com/nan
 
 ## Installation
 
+First you'll need a copy of [nng](https://github.com/nanomsg/nng)
+
+	git clone https://github.com/nanomsg/nng
+	cd nng
+	mkdir build
+	cd build
+	cmake .. -DBUILD_SHARED_LIBS=True
+	make && sudo make install
+
+
 The easiest way to download lua-nng is with [luarocks](https://github.com/luarocks/luarocks).
+
+You can also clone this repository and build locally
+
+	git clone https://cogarr.net/source/cgit.cgi/lua-nng
+	cd lua-nng
+	sudo luarocks build
+
 
 ```
 luarocks install --server=http://rocks.cogarr.net lua-nng
