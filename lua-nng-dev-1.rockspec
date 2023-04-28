@@ -22,11 +22,12 @@ build = {
 	type = "make",
 	build_variables = {
 		CFLAGS="$(CFLAGS)",
+		LDFLAGS="$(LDFLAGS)",
 		LUA_INCDIR="$(LUA_INCDIR)",
 		LUA_LIBDIR="$(LUA_LIBDIR)",
+		LUA_LIB="$(LUA_LIB)",
 		NNG_INCDIR="$(NNG_INCDIR)",
 		NNG_LIBDIR="$(NNG_LIBDIR)",
-		FIND="$(FIND)",
 		LIB_EXTENSION="$(LIB_EXTENSION)",
 		LIBFLAG="$(LIBFLAG)",
 	},
