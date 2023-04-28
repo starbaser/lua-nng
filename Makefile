@@ -20,7 +20,7 @@ else
 endif
 
 
-src_files=$(shell find src/*.c)
+src_files=$(wildcard src/*.c)
 obj_files=$(src_files:src/%.c=build/%.o)
 target=bin/nng.$(LIB_EXTENSION)
 
