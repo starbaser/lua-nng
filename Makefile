@@ -23,18 +23,23 @@ endif
 src_files=$(wildcard src/*.c)
 obj_files=$(src_files:src/%.c=build/%.o)
 target=bin/nng.$(LIB_EXTENSION)
+installed_target=$(target:bin/%=$(INST_LIBDIR)/%)
+
+.PHONY: all install test clean
 
 all: $(target)
 
 $(target) : $(obj_files)
-	echo "Lua_lib is: $(LUA_LIB), libs are: $(LIBS)"
 	$(LD) $(LADFLAGS) -o $@ $^ $(LIBS)
+
+$(installed_target) : $(target)
+	$(MKDIR) -p $(@D)
+	$(CP) $< $@
 
 $(obj_files): build/%.o : src/%.c
 	$(CC) $(CAFLAGS) -c -o $@ $<
 
-install: $(target)
-	$(CP) $(target) $(INST_LIBDIR)
+install: $(installed_target)
 
 test:
 	busted --cpath=./bin/?$(SHARE_EXT)

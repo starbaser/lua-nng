@@ -37,6 +37,7 @@ build = {
 		NNG_LIBDIR="$(NNG_LIBDIR)",
 		LUA_LIBDIR="$(LUA_LIBDIR)",
 		LIB_EXTENSION="$(LIB_EXTENSION)",
+		MKDIR="$(MKDIR)",
 		CP="$(CP)",
 	},
 }
