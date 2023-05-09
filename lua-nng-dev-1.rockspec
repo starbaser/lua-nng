@@ -23,6 +23,7 @@ build = {
 	build_variables = {
 		CFLAGS="$(CFLAGS)",
 		LDFLAGS="$(LDFLAGS)",
+		LIBS="$(LIBS)",
 		LUA_INCDIR="$(LUA_INCDIR)",
 		LUA_LIBDIR="$(LUA_LIBDIR)",
 		LUA_LIB="$(LUA_LIB)",
