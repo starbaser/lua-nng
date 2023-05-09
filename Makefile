@@ -1,22 +1,24 @@
 CC?=gcc
-CAFLAGS+=-I$(NNG_INCDIR) -I$(LUA_INCDIR) -L$(LUA_LIBDIR) $(CFLAGS)
-LADFLAGS+=$(LIBFLAG) $(LDFLAGS)
-LIBS=-lnng
+LIBS?=-lnng
 ifdef NNG_LIBDIR
-	LADFLAGS+= -L$(NNG_LIBDIR)
+	LDFLAGS+= -L$(NNG_LIBDIR)
 endif
 ifdef LUA_LIBDIR
-	LADFLAGS+= -L$(LUA_LIBDIR)
+	LDFLAGS+= -L$(LUA_LIBDIR)
 endif
 ifdef LUA_LIB
 	LIBS+= -l$(LUA_LIB)
 endif
-LD=gcc
+ifdef NNG_INCDIR
+	CFLAGS+= -I$(NNG_INCDIR)
+endif
+ifdef LUA_INCDIR
+	CFLAGS+= -I$(LUA_INCDIR)
+endif
 
 ifeq ($(OS), Windows_NT)
 	LDFLAGS+=-mwindows
 	LIBS+=-lws2_32
-else
 endif
 
 
@@ -30,14 +32,14 @@ installed_target=$(target:bin/%=$(INST_LIBDIR)/%)
 all: $(target)
 
 $(target) : $(obj_files)
-	$(LD) $(LADFLAGS) -o $@ $^ $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 $(installed_target) : $(target)
 	$(MKDIR) -p $(@D)
 	$(CP) $< $@
 
 $(obj_files): build/%.o : src/%.c
-	$(CC) $(CAFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 install: $(installed_target)
 
