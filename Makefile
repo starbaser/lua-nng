@@ -1,5 +1,5 @@
-CC?=gcc
-LIBS?=-lnng
+CC=gcc
+LIBS+=-lnng
 ALL_CFLAGS=$(CFLAGS)
 ALL_LDFLAGS=$(LDFLAGS)
 ifdef NNG_LIBDIR
@@ -17,7 +17,9 @@ endif
 ifdef LUA_INCDIR
 	ALL_CFLAGS+= -I$(LUA_INCDIR)
 endif
-
+ifndef CC
+	CC=gcc
+endif
 ifeq ($(OS), Windows_NT)
 	ALL_LDFLAGS+=-mwindows
 	LIBS+=-lws2_32
