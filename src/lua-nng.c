@@ -83,6 +83,11 @@ nng_socket* tosocket(lua_State *L, int offset){
 	return (nng_socket*)lua_touserdata(L,offset);
 }
 
+nng_ctx* tocontext(lua_State *L, int offset){
+	luaL_checkudata(L,offset,"nng.context");
+	return (nng_ctx*)lua_touserdata(L,offset);
+}
+
 nng_listener* tolistener(lua_State *L, int offset){
 	luaL_checkudata(L,offset,"nng.listener");
 	return (nng_listener*)lua_touserdata(L,offset);
@@ -96,6 +101,112 @@ nng_dialer* todialer(lua_State *L, int offset){
 nng_sockaddr* tosockaddr(lua_State *L, int offset){
 	luaL_checkudata(L,offset,"nng.sockaddr");
 	return (nng_sockaddr*)lua_touserdata(L,offset);
+}
+
+// socket:new_context() :: ctx
+int lnng_socket_new_context(lua_State *L) {
+	nng_socket *sock = tosocket(L, 1);
+	nng_ctx *ctx = (nng_ctx*)lua_newuserdata(L, sizeof(nng_ctx));
+	int err = nng_ctx_open(ctx, *sock);
+	if (err == 0) {
+		luaL_setmetatable(L, "nng.context");
+		return 1;
+	} else {
+		lua_pushboolean(L, 0);
+		lua_pushstring(L, nng_strerror(err));
+		return 2;
+	}
+}
+
+// ctx:send(data[, timeout_ms])
+int lnng_ctx_send(lua_State *L) {
+	nng_ctx *ctx = tocontext(L, 1);
+	size_t datasize;
+	const char *data = luaL_checklstring(L, 2, &datasize);
+	int timeout_ms = luaL_optinteger(L, 3, -1);
+
+	nng_aio *aio;
+	int err = nng_aio_alloc(&aio, NULL, NULL);
+	if (err != 0) {
+		lua_pushboolean(L, 0);
+		lua_pushstring(L, nng_strerror(err));
+		return 2;
+	}
+	if (timeout_ms >= 0) nng_aio_set_timeout(aio, timeout_ms);
+
+	nng_msg *msg;
+	err = nng_msg_alloc(&msg, 0);
+	if (err != 0) {
+		nng_aio_free(aio);
+		lua_pushboolean(L, 0);
+		lua_pushstring(L, nng_strerror(err));
+		return 2;
+	}
+	err = nng_msg_append(msg, data, datasize);
+	if (err != 0) {
+		nng_msg_free(msg);
+		nng_aio_free(aio);
+		lua_pushboolean(L, 0);
+		lua_pushstring(L, nng_strerror(err));
+		return 2;
+	}
+
+	nng_aio_set_msg(aio, msg);
+	nng_ctx_send(*ctx, aio);
+	nng_aio_wait(aio);
+	err = nng_aio_result(aio);
+
+	if (err != 0) {
+		nng_msg_free(msg);  // nng didn't take ownership on failure
+		nng_aio_free(aio);
+		lua_pushboolean(L, 0);
+		lua_pushstring(L, nng_strerror(err));
+		return 2;
+	}
+	nng_aio_free(aio);
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+// ctx:recv([timeout_ms]) :: data
+int lnng_ctx_recv(lua_State *L) {
+	nng_ctx *ctx = tocontext(L, 1);
+	int timeout_ms = luaL_optinteger(L, 2, -1);
+
+	nng_aio *aio;
+	int err = nng_aio_alloc(&aio, NULL, NULL);
+	if (err != 0) {
+		lua_pushboolean(L, 0);
+		lua_pushstring(L, nng_strerror(err));
+		return 2;
+	}
+	if (timeout_ms >= 0) nng_aio_set_timeout(aio, timeout_ms);
+
+	nng_ctx_recv(*ctx, aio);
+	nng_aio_wait(aio);
+	err = nng_aio_result(aio);
+
+	if (err != 0) {
+		nng_aio_free(aio);
+		lua_pushboolean(L, 0);
+		lua_pushstring(L, nng_strerror(err));
+		return 2;
+	}
+
+	nng_msg *msg = nng_aio_get_msg(aio);
+	size_t len = nng_msg_len(msg);
+	void *body = nng_msg_body(msg);
+	lua_pushlstring(L, (const char*)body, len);
+	nng_msg_free(msg);
+	nng_aio_free(aio);
+	return 1;
+}
+
+// ctx:close()
+int lnng_ctx_close(lua_State *L) {
+	nng_ctx *ctx = tocontext(L, 1);
+	nng_ctx_close(*ctx);
+	return 0;
 }
 
 
@@ -564,12 +675,20 @@ static const struct luaL_Reg nng_listener_m[] = {
 	{NULL, NULL}
 };
 
+static const struct luaL_Reg nng_ctx_m[] = {
+	{"send",  lnng_ctx_send},
+	{"recv",  lnng_ctx_recv},
+	{"close", lnng_ctx_close},
+	{NULL, NULL}
+};
+
 static const struct luaL_Reg nng_socket_m[] = {
 	{"dial", lnng_dial},
 	{"listen", lnng_listen},
 	{"send", lnng_send},
 	{"recv", lnng_recv},
 	{"close", lnng_socket_close},
+	{"new_context", lnng_socket_new_context},
 
 	//pub/sub only
 	{"subscribe",lnng_subscribe},
@@ -628,6 +747,13 @@ int luaopen_nng(lua_State *L){
 	lua_setfield(L,-2,"__index");
 	/*lua_pushcfunction(L,lnng_listener_close);*/
 	/*lua_setfield(L,-2,"__gc");*/
+	lua_pop(L,1);
+
+	luaL_newmetatable(L,"nng.context");
+	luaL_newlib(L,nng_ctx_m);
+	lua_setfield(L,-2,"__index");
+	lua_pushcfunction(L,lnng_ctx_close);
+	lua_setfield(L,-2,"__gc");
 	lua_pop(L,1);
 
 	luaL_newmetatable(L,"nng.sockaddr");//{nng.sockaddr}
